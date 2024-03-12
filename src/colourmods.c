@@ -1,5 +1,6 @@
 #include "../include/colourmods.h"
 #include "../include/display.h"
+#include <complex.h>
 #include <stdio.h>
 #include <stdlib.h>
 /*
@@ -57,6 +58,10 @@ void setcolour24(colour24 colour, unsigned char _BR, unsigned char _BG,
   colour[FCID] = 2;
 }
 
+inline void resetfg24(colour24 colour) { colour[FCID] = 0; }
+
+inline void resetbg24(colour24 colour) { colour[BCID] = 0; }
+
 int _clrstrtol(char ch) {
   if (ch >= '0' && ch <= '9')
     return ch - 48;
@@ -100,11 +105,13 @@ int _hexto24(colour24 colour, const char *hex, rgb_index offset) {
   colour[FB + delta] = 16 * temp;
   HEXTO24RETURN
   colour[FB + delta] += temp;
+
+#undef HEXTO24RETURN
   return 0;
 }
 
 int hexto24(colour24 colour, const char *hexbg, const char *hexfg) {
-  int status;
+  int status = 0;
   if (hexbg != NULL)
     status = _hexto24(colour, hexbg, BG);
 
@@ -195,6 +202,72 @@ int difference24(colour24 colour1, colour24 colour2) {
   return diff;
 }
 
-float value24(colour24 colour) {
+inline float value24(colour24 colour) {
   return (colour[FR] + colour[FG] + colour[FB]) / (255.0f * 3);
+}
+
+colour4 tocolour4(colour24 colour, rgb_index FG_BG) {
+  colour24 list[16];
+
+  for (int i = BLACK; i <= BRIGHT_WHITE; i++) {
+    newcolour24(list[i]);
+  }
+  /*
+    BLACK: #000000
+    RED: #800000
+    GREEN: #008000
+    YELLOW: #808000
+    BLUE: #000080
+    MAGENTA: #800080
+    CYAN: #008080
+    WHITE: #C0C0C0
+
+    BRIGHT_BLACK: #808080
+    BRIGHT_RED: #FF0000
+    BRIGHT_GREEN: #00FF00
+    BRIGHT_YELLOW: #FFFF00
+    BRIGHT_BLUE: #0000FF
+    BRIGHT_MAGENTA: #FF00FF
+    BRIGHT_CYAN: #00FFFF
+    BRIGHT_WHITE: #FFFFFF
+  */
+
+  char *hex[] = {"000000", "800000", "008000", "808000", "000080", "800080",
+                 "008080", "c0c0c0", "808080", "ff0000", "00ff00", "ffff00",
+                 "0000ff", "ff00ff", "00ffff", "ffffff"};
+
+  for (int i = BLACK; i <= BRIGHT_WHITE; i++) {
+    if (FG_BG == FG)
+      hexto24(list[i], NULL, hex[i]);
+    else
+      hexto24(list[i], hex[i], NULL);
+  }
+
+  colour24 colour2;
+  newcolour24(colour2);
+
+  if (FG_BG == FG)
+    setfgcolour24(colour2, colour[FR], colour[FG], colour[FB]);
+  else
+    setfgcolour24(colour2, colour[BR], colour[BG], colour[BB]);
+
+  int diff[16];
+
+  for (int i = BLACK; i <= BRIGHT_WHITE; i++) {
+    diff[i] = difference24(list[i], colour2);
+  }
+
+  // find the closest match with smallest difference
+  int smallest = 0;
+  for (int i = 1; i < 16; ++i) {
+    if (diff[i] == 0) {
+      smallest = i;
+      break;
+    }
+    if (diff[i] < diff[smallest]) {
+      smallest = i;
+    }
+  }
+
+  return getcolour4(0, smallest);
 }
